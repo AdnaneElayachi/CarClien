@@ -1,0 +1,66 @@
+version: '3'
+
+services:
+  mysql:
+    image: mysql:latest
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: control
+    ports:
+      - "3306:3306"
+
+  backend:
+    build:
+      context: ./
+    ports:
+      - "8082:8082"  # Assurez-vous que le port exposé correspond à celui de votre application backend
+    depends_on:
+      - mysql
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/
+      SPRING_DATASOURCE_USERNAME: root
+      SPRING_DATASOURCE_PASSWORD: root
+    healthcheck:
+      test: "/usr/bin/mysql --user=root --password=root --execute \"SHOW DATABASES;\""
+      interval: 5s
+      timeout: 2s
+      retries: 100
+
+  gateway:
+    build:
+      context: ./
+    ports:
+      - "8888:8888"  # Assurez-vous que le port exposé correspond à celui de votre application gateway
+    depends_on:
+      - backend
+    environment:
+      BACKEND_SERVICE_URL: http://backend:8082  # Assurez-vous que l'URL correspond à votre configuration
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://backend:8082/actuator/health"]
+      interval: 5s
+      timeout: 2s
+      retries: 100
+
+  phpmyadmin:
+    image: phpmyadmin/phpmyadmin
+    environment:
+      PMA_HOST: mysql
+      PMA_PORT: 3306
+      MYSQL_ROOT_PASSWORD: root
+    ports:
+      - "8081:80"
+
+  client:
+    build:
+      context: ./
+    ports:
+      - "8088:8088"  # Assurez-vous que le port exposé correspond à celui de votre application client
+    depends_on:
+      - gateway
+    environment:
+      GATEWAY_URL: http://gateway:8888  # Assurez-vous que l'URL correspond à votre configuration
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://gateway:8888/SERVICE-CAR/api/actuator/health"]
+      interval: 5s
+      timeout: 2s
+      retries: 100
